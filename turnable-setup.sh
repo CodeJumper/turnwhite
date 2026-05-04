@@ -6,20 +6,14 @@
 
 set -e
 
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
-
 INSTALL_DIR="$HOME/Turnable"
-LISTEN_ADDR="127.0.0.1:5080"
 BASH_BIN="/data/data/com.termux/files/usr/bin/bash"
+TTY=/dev/tty
 
-print_step() { echo -e "\n${CYAN}[$1/$TOTAL_STEPS]${NC} $2"; }
-print_ok()   { echo -e "${GREEN}  OK:${NC} $1"; }
-print_warn() { echo -e "${YELLOW}  !:${NC} $1"; }
-print_err()  { echo -e "${RED}  ОШИБКА:${NC} $1"; }
+ask() {
+    printf "%s" "$1"
+    read REPLY < $TTY
+}
 
 echo ""
 echo "========================================"
@@ -27,17 +21,17 @@ echo "  Turnable Client — установка для Android"
 echo "========================================"
 echo ""
 
-TOTAL_STEPS=6
+TOTAL=6
 
 # ─── Шаг 1: Проверка окружения ───
-print_step 1 "Проверка окружения..."
+echo ""
+echo "[$((STEP=1))/$TOTAL] Проверка окружения..."
 
 if [ ! -d "/data/data/com.termux" ]; then
-    print_err "Этот скрипт предназначен только для Termux на Android"
+    echo "  ОШИБКА: Только для Termux на Android"
     exit 1
 fi
-print_ok "Termux обнаружен"
-print_ok "Bash: $BASH_BIN"
+echo "  OK: Termux обнаружен"
 
 ARCH=$(uname -m)
 case "$ARCH" in
@@ -45,27 +39,24 @@ case "$ARCH" in
     armv7l|armv8l) BIN_ARCH="arm" ;;
     x86_64)        BIN_ARCH="amd64" ;;
     i386|i686)     BIN_ARCH="386" ;;
-    *)
-        print_err "Неизвестная архитектура: $ARCH"
-        exit 1
-        ;;
+    *)             echo "  ОШИБКА: Неизвестная архитектура: $ARCH"; exit 1 ;;
 esac
-print_ok "Архитектура: $ARCH ($BIN_ARCH)"
+echo "  OK: Архитектура: $ARCH ($BIN_ARCH)"
 
 mkdir -p "$INSTALL_DIR"
-print_ok "Папка: $INSTALL_DIR"
 
 # ─── Шаг 2: Получить бинарник ───
-print_step 2 "Получение Turnable..."
+echo ""
+echo "[$((STEP=2))/$TOTAL] Получение Turnable..."
 
+SKIP_DOWNLOAD=""
 if [ -f "$INSTALL_DIR/turnable" ]; then
-    echo -e "  Turnable уже установлен."
-    echo -n "  Переустановить? (д/н): "
-    read -r REINSTALL
-    if [[ "$REINSTALL" != "д" && "$REINSTALL" != "y" ]]; then
-        print_ok "Оставляю текущую версию"
-        SKIP_DOWNLOAD=1
-    fi
+    echo "  Turnable уже установлен."
+    ask "  Переустановить? (д/н): "
+    case "$REPLY" in
+        д|y) ;;
+        *)   echo "  OK: Оставляю текущую версию"; SKIP_DOWNLOAD=1 ;;
+    esac
 fi
 
 if [ -z "$SKIP_DOWNLOAD" ]; then
@@ -74,100 +65,87 @@ if [ -z "$SKIP_DOWNLOAD" ]; then
     echo "  1) Скачать с GitHub (нужен доступ к GitHub)"
     echo "  2) У меня уже есть файл на телефоне (скачал через ВК/Telegram)"
     echo ""
-    echo -n "  Выбери (1 или 2): "
-    read -r DL_METHOD
+    ask "  Выбери (1 или 2): "
 
-    if [ "$DL_METHOD" = "1" ]; then
+    if [ "$REPLY" = "1" ]; then
         echo "  Скачиваю turnable-android-$BIN_ARCH ..."
         if curl --fail --progress-bar -L -o "$INSTALL_DIR/turnable" \
             "https://github.com/TheAirBlow/Turnable/releases/latest/download/turnable-android-$BIN_ARCH"; then
             chmod +x "$INSTALL_DIR/turnable"
-            print_ok "Скачан и установлен"
+            echo "  OK: Скачан и установлен"
         else
-            print_err "Не удалось скачать. Нет доступа к GitHub?"
-            print_warn "Скачай файл вручную и запусти скрипт снова (вариант 2)"
+            echo "  ОШИБКА: Не удалось скачать. Нет доступа к GitHub?"
             exit 1
         fi
     else
-        echo ""
-        echo "  Где лежит файл? Варианты:"
-        echo "    a) ~/storage/downloads/  (папка Загрузки)"
-        echo "    b) Указать путь вручную"
-        echo ""
-
         if [ ! -d "$HOME/storage" ]; then
-            print_warn "Нужен доступ к хранилищу телефона"
+            echo "  Нужен доступ к хранилищу телефона..."
             termux-setup-storage
             sleep 3
         fi
 
         echo "  Ищу файлы turnable в Загрузках..."
-        FOUND_FILES=$(find "$HOME/storage/downloads" -name "turnable*" 2>/dev/null | head -5)
+        FOUND=""
+        NUM=0
+        for f in $(find "$HOME/storage/downloads" -name "turnable*" 2>/dev/null | head -5); do
+            NUM=$((NUM + 1))
+            echo "    $NUM) $(basename "$f")"
+            eval "FILE_$NUM=\"$f\""
+            FOUND=1
+        done
 
-        if [ -n "$FOUND_FILES" ]; then
-            echo -e "  ${GREEN}Найдены файлы:${NC}"
-            i=1
-            declare -a FILE_LIST
-            while IFS= read -r f; do
-                echo "    $i) $(basename "$f")"
-                FILE_LIST[$i]="$f"
-                ((i++))
-            done <<< "$FOUND_FILES"
-            echo "    $i) Указать путь вручную"
+        if [ -n "$FOUND" ]; then
+            echo "    $((NUM + 1))) Указать путь вручную"
             echo ""
-            echo -n "  Выбери номер: "
-            read -r FILE_NUM
-
-            if [ "$FILE_NUM" -lt "$i" ] 2>/dev/null && [ "$FILE_NUM" -gt 0 ]; then
-                CHOSEN="${FILE_LIST[$FILE_NUM]}"
+            ask "  Выбери номер: "
+            if [ "$REPLY" -le "$NUM" ] 2>/dev/null && [ "$REPLY" -gt 0 ] 2>/dev/null; then
+                eval "CHOSEN=\$FILE_$REPLY"
             else
-                echo -n "  Введи полный путь к файлу: "
-                read -r CHOSEN
+                ask "  Введи полный путь к файлу: "
+                CHOSEN="$REPLY"
             fi
         else
-            print_warn "Файлы не найдены в Загрузках"
-            echo -n "  Введи полный путь к файлу: "
-            read -r CHOSEN
+            echo "  Файлы не найдены в Загрузках"
+            ask "  Введи полный путь к файлу: "
+            CHOSEN="$REPLY"
         fi
 
         if [ ! -f "$CHOSEN" ]; then
-            print_err "Файл не найден: $CHOSEN"
+            echo "  ОШИБКА: Файл не найден: $CHOSEN"
             exit 1
         fi
 
         cp "$CHOSEN" "$INSTALL_DIR/turnable"
         chmod +x "$INSTALL_DIR/turnable"
-        print_ok "Файл скопирован: $(basename "$CHOSEN")"
+        echo "  OK: Файл скопирован"
     fi
 fi
 
 if ! "$INSTALL_DIR/turnable" --help >/dev/null 2>&1; then
-    print_err "Бинарник не работает. Возможно, неправильная архитектура."
-    print_warn "Твоя архитектура: $ARCH — нужен файл turnable-android-$BIN_ARCH"
+    echo "  ОШИБКА: Бинарник не работает. Нужен turnable-android-$BIN_ARCH"
     exit 1
 fi
-print_ok "Turnable работает"
+echo "  OK: Turnable работает"
 
 # ─── Шаг 3: Настройка конфигурации ───
-print_step 3 "Настройка конфигурации..."
+echo ""
+echo "[$((STEP=3))/$TOTAL] Настройка конфигурации..."
 
 CONFIG_FILE="$INSTALL_DIR/wireguard.txt"
+SKIP_CONFIG=""
 
 if [ -f "$CONFIG_FILE" ]; then
-    CURRENT_URL=$(cat "$CONFIG_FILE")
     echo ""
     echo "  Текущий Turnable URL:"
-    echo "  $CURRENT_URL"
+    echo "  $(cat "$CONFIG_FILE")"
     echo ""
-    echo "  Что сделать?"
     echo "  1) Оставить текущий URL"
     echo "  2) Заменить на новый (например, с другим кол-вом peers)"
     echo ""
-    printf "  Выбери (1 или 2): "
-    read REPLACE_CFG
+    ask "  Выбери (1 или 2): "
 
-    if [ "$REPLACE_CFG" = "1" ]; then
-        print_ok "Оставляю текущий конфиг"
+    if [ "$REPLY" = "1" ]; then
+        echo "  OK: Оставляю текущий конфиг"
         SKIP_CONFIG=1
     fi
 fi
@@ -175,38 +153,37 @@ fi
 if [ -z "$SKIP_CONFIG" ]; then
     echo ""
     echo "  Вставь URL конфигурации от сервера Turnable."
-    echo "  Он выглядит как: turnable://uuid:call@vk.com/wg?pub_key=...&type=relay&..."
+    echo "  Выглядит как: turnable://uuid:call@vk.com/wg?pub_key=..."
     echo ""
-    echo "  (Получить его можно на сервере командой:"
-    echo "   ./turnable config generate UUID ROUTE)"
+    echo "  (На сервере: ./turnable config generate UUID ROUTE)"
     echo ""
-    printf "  URL: "
-    read CONFIG_URL
+    ask "  URL: "
+    CONFIG_URL="$REPLY"
 
     if [ -z "$CONFIG_URL" ]; then
-        print_err "URL не может быть пустым"
+        echo "  ОШИБКА: URL не может быть пустым"
         exit 1
     fi
 
     case "$CONFIG_URL" in
-        turnable://*)
-            ;;
+        turnable://*) ;;
         *)
-            print_warn "URL не начинается с turnable:// — возможно ошибка"
-            printf "  Продолжить всё равно? (д/н): "
-            read FORCE
-            if [ "$FORCE" != "д" ] && [ "$FORCE" != "y" ]; then
-                exit 1
-            fi
+            echo "  ! URL не начинается с turnable:// — возможно ошибка"
+            ask "  Продолжить? (д/н): "
+            case "$REPLY" in
+                д|y) ;;
+                *)   exit 1 ;;
+            esac
             ;;
     esac
 
     echo "$CONFIG_URL" > "$CONFIG_FILE"
-    print_ok "Конфиг сохранён"
+    echo "  OK: Конфиг сохранён"
 fi
 
 # ─── Шаг 4: Создание скриптов ───
-print_step 4 "Создание скриптов запуска..."
+echo ""
+echo "[$((STEP=4))/$TOTAL] Создание скриптов запуска..."
 
 cat > "$INSTALL_DIR/start.sh" << STARTEOF
 #!${BASH_BIN}
@@ -297,10 +274,11 @@ fi
 STATEOF
 chmod +x "$INSTALL_DIR/status.sh"
 
-print_ok "Создано: start.sh, start-bg.sh, stop.sh, status.sh"
+echo "  OK: start.sh, start-bg.sh, stop.sh, status.sh"
 
 # ─── Шаг 5: Виджеты для домашнего экрана ───
-print_step 5 "Настройка виджетов (Termux:Widget)..."
+echo ""
+echo "[$((STEP=5))/$TOTAL] Настройка виджетов..."
 
 mkdir -p "$HOME/.shortcuts"
 
@@ -312,8 +290,8 @@ echo ""
 echo "Теперь включи WireGuard в NekoBox"
 am start -n moe.nb4a/.ui.MainActivity 2>/dev/null
 echo ""
-echo "Нажми Enter чтобы закрыть это окно"
-read
+echo "Нажми Enter чтобы закрыть"
+read < /dev/tty
 WONEOF
 chmod +x "$HOME/.shortcuts/VPN-ON.sh"
 
@@ -324,7 +302,7 @@ ${BASH_BIN} stop.sh
 echo "Не забудь отключить NekoBox"
 echo ""
 echo "Нажми Enter чтобы закрыть"
-read
+read < /dev/tty
 WOFFEOF
 chmod +x "$HOME/.shortcuts/VPN-OFF.sh"
 
@@ -334,25 +312,22 @@ cd "$INSTALL_DIR"
 ${BASH_BIN} status.sh
 echo ""
 echo "Нажми Enter чтобы закрыть"
-read
+read < /dev/tty
 WSTEOF
 chmod +x "$HOME/.shortcuts/VPN-STATUS.sh"
 
-print_ok "Виджеты созданы: VPN-ON, VPN-OFF, VPN-STATUS"
-print_warn "Добавь виджет Termux:Widget на домашний экран"
+echo "  OK: VPN-ON, VPN-OFF, VPN-STATUS"
 
-# ─── Шаг 6: Автозапуск при загрузке ───
-print_step 6 "Автозапуск при включении телефона (Termux:Boot)..."
+# ─── Шаг 6: Автозапуск ───
+echo ""
+echo "[$((STEP=6))/$TOTAL] Автозапуск при включении телефона..."
 
-echo "  Хочешь чтобы Turnable запускался при включении телефона?"
-echo "  (нужен Termux:Boot)"
-echo -n "  Настроить? (д/н): "
-read -r SETUP_BOOT
-
-if [[ "$SETUP_BOOT" == "д" || "$SETUP_BOOT" == "y" ]]; then
-    mkdir -p "$HOME/.termux/boot"
-
-    cat > "$HOME/.termux/boot/start-turnable.sh" << BOOTEOF
+echo "  Настроить автозапуск? (нужен Termux:Boot)"
+ask "  (д/н): "
+case "$REPLY" in
+    д|y)
+        mkdir -p "$HOME/.termux/boot"
+        cat > "$HOME/.termux/boot/start-turnable.sh" << BOOTEOF
 #!${BASH_BIN}
 sleep 15
 cd "$INSTALL_DIR"
@@ -360,50 +335,34 @@ pkill -f "turnable client" 2>/dev/null
 CONFIG_URL=\$(cat wireguard.txt)
 nohup ./turnable client -l 127.0.0.1:5080 -i "\$CONFIG_URL" > turnable.log 2>&1 &
 BOOTEOF
-    chmod +x "$HOME/.termux/boot/start-turnable.sh"
-
-    print_ok "Автозапуск настроен"
-    print_warn "Не забудь открыть Termux:Boot хотя бы раз"
-else
-    print_ok "Пропущено"
-fi
+        chmod +x "$HOME/.termux/boot/start-turnable.sh"
+        echo "  OK: Автозапуск настроен"
+        echo "  !  Открой Termux:Boot хотя бы раз"
+        ;;
+    *)
+        echo "  OK: Пропущено"
+        ;;
+esac
 
 # ─── Итог ───
 echo ""
 echo "========================================"
-echo -e "  ${GREEN}Установка завершена!${NC}"
+echo "  Установка завершена!"
 echo "========================================"
 echo ""
-echo "  Файлы: $INSTALL_DIR/"
+echo "  ~/Turnable/"
 echo "  ├── turnable        — ядро"
 echo "  ├── wireguard.txt   — конфиг"
-echo "  ├── start.sh        — запуск (с логами в терминале)"
+echo "  ├── start.sh        — запуск (с логами)"
 echo "  ├── start-bg.sh     — запуск в фоне"
 echo "  ├── stop.sh         — остановка"
-echo "  └── status.sh       — проверка статуса"
+echo "  └── status.sh       — статус"
 echo ""
-echo "  ─── Как использовать ───"
+echo "  Использование:"
+echo "    cd ~/Turnable && bash start.sh"
 echo ""
-echo "  В Termux:"
-echo "    cd ~/Turnable && bash start.sh     # с логами"
-echo "    cd ~/Turnable && bash start-bg.sh  # в фоне"
-echo "    cd ~/Turnable && bash stop.sh      # остановить"
-echo "    cd ~/Turnable && bash status.sh    # статус"
+echo "  Или кнопки: VPN-ON / VPN-OFF / VPN-STATUS"
 echo ""
-echo "  С домашнего экрана:"
-echo "    Кнопка VPN-ON    — запустить"
-echo "    Кнопка VPN-OFF   — остановить"
-echo "    Кнопка VPN-STATUS — проверить"
-echo ""
-echo "  ─── Порядок включения VPN ───"
-echo ""
-echo "  1. Запусти Turnable (кнопка или bash start.sh)"
-echo "  2. Подожди ~10 секунд"
-echo "  3. Включи WireGuard в NekoBox"
-echo ""
-echo "  ─── Первый запуск ───"
-echo ""
-echo "  При первом запуске нужно пройти капчу ВК."
-echo "  Инструкция появится в логах."
+echo "  Порядок: Turnable -> подождать -> NekoBox"
 echo ""
 echo "========================================"

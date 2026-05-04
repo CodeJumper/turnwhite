@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/data/data/com.termux/files/usr/bin/bash
 
 # ============================================================
 #  Turnable Client — установка и настройка для Android (Termux)
@@ -14,6 +14,7 @@ NC='\033[0m'
 
 INSTALL_DIR="$HOME/Turnable"
 LISTEN_ADDR="127.0.0.1:5080"
+BASH_BIN="$(which bash)"
 
 print_step() { echo -e "\n${CYAN}[$1/$TOTAL_STEPS]${NC} $2"; }
 print_ok()   { echo -e "${GREEN}  OK:${NC} $1"; }
@@ -36,6 +37,7 @@ if [ ! -d "/data/data/com.termux" ]; then
     exit 1
 fi
 print_ok "Termux обнаружен"
+print_ok "Bash: $BASH_BIN"
 
 ARCH=$(uname -m)
 case "$ARCH" in
@@ -93,14 +95,12 @@ if [ -z "$SKIP_DOWNLOAD" ]; then
         echo "    b) Указать путь вручную"
         echo ""
 
-        # Дать доступ к хранилищу
         if [ ! -d "$HOME/storage" ]; then
             print_warn "Нужен доступ к хранилищу телефона"
             termux-setup-storage
             sleep 3
         fi
 
-        # Поиск файла
         echo "  Ищу файлы turnable в Загрузках..."
         FOUND_FILES=$(find "$HOME/storage/downloads" -name "turnable*" 2>/dev/null | head -5)
 
@@ -141,7 +141,6 @@ if [ -z "$SKIP_DOWNLOAD" ]; then
     fi
 fi
 
-# Проверка
 if ! "$INSTALL_DIR/turnable" --help >/dev/null 2>&1; then
     print_err "Бинарник не работает. Возможно, неправильная архитектура."
     print_warn "Твоя архитектура: $ARCH — нужен файл turnable-android-$BIN_ARCH"
@@ -196,35 +195,33 @@ fi
 # ─── Шаг 4: Создание скриптов ───
 print_step 4 "Создание скриптов запуска..."
 
-# Скрипт запуска
-cat > "$INSTALL_DIR/start.sh" << 'STARTEOF'
-#!/usr/bin/env bash
-cd "$(dirname "$0")"
+cat > "$INSTALL_DIR/start.sh" << STARTEOF
+#!${BASH_BIN}
+cd "$INSTALL_DIR"
 LISTEN="127.0.0.1:5080"
 CONFIG="wireguard.txt"
 
 if [ ! -f "turnable" ]; then
-    echo "ОШИБКА: файл turnable не найден в $(pwd)"
+    echo "ОШИБКА: файл turnable не найден в \$(pwd)"
     exit 1
 fi
-if [ ! -f "$CONFIG" ]; then
-    echo "ОШИБКА: файл $CONFIG не найден в $(pwd)"
+if [ ! -f "\$CONFIG" ]; then
+    echo "ОШИБКА: файл \$CONFIG не найден в \$(pwd)"
     exit 1
 fi
 
 pkill -f "turnable client" 2>/dev/null
 sleep 1
 
-echo "Запускаю Turnable на $LISTEN ..."
-CONFIG_URL=$(cat "$CONFIG")
-./turnable client -l "$LISTEN" "$CONFIG_URL"
+echo "Запускаю Turnable на \$LISTEN ..."
+CONFIG_URL=\$(cat "\$CONFIG")
+./turnable client -l "\$LISTEN" "\$CONFIG_URL"
 STARTEOF
 chmod +x "$INSTALL_DIR/start.sh"
 
-# Скрипт фонового запуска
-cat > "$INSTALL_DIR/start-bg.sh" << 'BGEOF'
-#!/usr/bin/env bash
-cd "$(dirname "$0")"
+cat > "$INSTALL_DIR/start-bg.sh" << BGEOF
+#!${BASH_BIN}
+cd "$INSTALL_DIR"
 LISTEN="127.0.0.1:5080"
 CONFIG="wireguard.txt"
 LOG="turnable.log"
@@ -233,54 +230,54 @@ if [ ! -f "turnable" ]; then
     echo "ОШИБКА: файл turnable не найден"
     exit 1
 fi
-if [ ! -f "$CONFIG" ]; then
-    echo "ОШИБКА: файл $CONFIG не найден"
+if [ ! -f "\$CONFIG" ]; then
+    echo "ОШИБКА: файл \$CONFIG не найден"
     exit 1
 fi
 
 pkill -f "turnable client" 2>/dev/null
 sleep 1
 
-CONFIG_URL=$(cat "$CONFIG")
-nohup ./turnable client -l "$LISTEN" -i "$CONFIG_URL" > "$LOG" 2>&1 &
-PID=$!
+CONFIG_URL=\$(cat "\$CONFIG")
+nohup ./turnable client -l "\$LISTEN" -i "\$CONFIG_URL" > "\$LOG" 2>&1 &
+PID=\$!
 sleep 2
 
-if kill -0 $PID 2>/dev/null; then
-    echo "Turnable запущен (PID: $PID)"
-    echo "Порт: $LISTEN"
-    echo "Логи: $(pwd)/$LOG"
-    echo "$PID" > turnable.pid
+if kill -0 \$PID 2>/dev/null; then
+    echo "Turnable запущен (PID: \$PID)"
+    echo "Порт: \$LISTEN"
+    echo "Логи: \$(pwd)/\$LOG"
+    echo "\$PID" > turnable.pid
 else
     echo "ОШИБКА: Turnable не запустился"
     echo "Последние логи:"
-    tail -20 "$LOG" 2>/dev/null
+    tail -20 "\$LOG" 2>/dev/null
     exit 1
 fi
 BGEOF
 chmod +x "$INSTALL_DIR/start-bg.sh"
 
-# Скрипт остановки
-cat > "$INSTALL_DIR/stop.sh" << 'STOPEOF'
-#!/usr/bin/env bash
-if [ -f "$(dirname "$0")/turnable.pid" ]; then
-    PID=$(cat "$(dirname "$0")/turnable.pid")
-    kill "$PID" 2>/dev/null
-    rm "$(dirname "$0")/turnable.pid"
+cat > "$INSTALL_DIR/stop.sh" << STOPEOF
+#!${BASH_BIN}
+cd "$INSTALL_DIR"
+if [ -f "turnable.pid" ]; then
+    PID=\$(cat "turnable.pid")
+    kill "\$PID" 2>/dev/null
+    rm "turnable.pid"
 fi
 pkill -f "turnable client" 2>/dev/null
 echo "Turnable остановлен"
 STOPEOF
 chmod +x "$INSTALL_DIR/stop.sh"
 
-# Скрипт проверки статуса
-cat > "$INSTALL_DIR/status.sh" << 'STATEOF'
-#!/usr/bin/env bash
+cat > "$INSTALL_DIR/status.sh" << STATEOF
+#!${BASH_BIN}
+cd "$INSTALL_DIR"
 if pgrep -f "turnable client" >/dev/null 2>&1; then
-    PID=$(pgrep -f "turnable client" | head -1)
-    echo "Turnable РАБОТАЕТ (PID: $PID)"
+    PID=\$(pgrep -f "turnable client" | head -1)
+    echo "Turnable РАБОТАЕТ (PID: \$PID)"
     echo "Последние логи:"
-    tail -5 "$(dirname "$0")/turnable.log" 2>/dev/null
+    tail -5 "turnable.log" 2>/dev/null
 else
     echo "Turnable НЕ запущен"
 fi
@@ -292,17 +289,12 @@ print_ok "Создано: start.sh, start-bg.sh, stop.sh, status.sh"
 # ─── Шаг 5: Виджеты для домашнего экрана ───
 print_step 5 "Настройка виджетов (Termux:Widget)..."
 
-echo "  Хочешь кнопки на домашнем экране? (нужен Termux:Widget)"
-echo -n "  Настроить? (д/н): "
-read -r SETUP_WIDGET
+mkdir -p "$HOME/.shortcuts"
 
-if [[ "$SETUP_WIDGET" == "д" || "$SETUP_WIDGET" == "y" ]]; then
-    mkdir -p "$HOME/.shortcuts"
-
-    cat > "$HOME/.shortcuts/VPN-ON.sh" << WONEOF
-#!/usr/bin/env bash
+cat > "$HOME/.shortcuts/VPN-ON.sh" << WONEOF
+#!${BASH_BIN}
 cd "$INSTALL_DIR"
-./start-bg.sh
+${BASH_BIN} start-bg.sh
 echo ""
 echo "Теперь включи WireGuard в NekoBox"
 am start -n moe.nb4a/.ui.MainActivity 2>/dev/null
@@ -310,34 +302,31 @@ echo ""
 echo "Нажми Enter чтобы закрыть это окно"
 read
 WONEOF
-    chmod +x "$HOME/.shortcuts/VPN-ON.sh"
+chmod +x "$HOME/.shortcuts/VPN-ON.sh"
 
-    cat > "$HOME/.shortcuts/VPN-OFF.sh" << WOFFEOF
-#!/usr/bin/env bash
+cat > "$HOME/.shortcuts/VPN-OFF.sh" << WOFFEOF
+#!${BASH_BIN}
 cd "$INSTALL_DIR"
-./stop.sh
+${BASH_BIN} stop.sh
 echo "Не забудь отключить NekoBox"
 echo ""
 echo "Нажми Enter чтобы закрыть"
 read
 WOFFEOF
-    chmod +x "$HOME/.shortcuts/VPN-OFF.sh"
+chmod +x "$HOME/.shortcuts/VPN-OFF.sh"
 
-    cat > "$HOME/.shortcuts/VPN-STATUS.sh" << WSTEOF
-#!/usr/bin/env bash
+cat > "$HOME/.shortcuts/VPN-STATUS.sh" << WSTEOF
+#!${BASH_BIN}
 cd "$INSTALL_DIR"
-./status.sh
+${BASH_BIN} status.sh
 echo ""
 echo "Нажми Enter чтобы закрыть"
 read
 WSTEOF
-    chmod +x "$HOME/.shortcuts/VPN-STATUS.sh"
+chmod +x "$HOME/.shortcuts/VPN-STATUS.sh"
 
-    print_ok "Виджеты созданы: VPN-ON, VPN-OFF, VPN-STATUS"
-    print_warn "Добавь виджет Termux:Widget на домашний экран"
-else
-    print_ok "Пропущено"
-fi
+print_ok "Виджеты созданы: VPN-ON, VPN-OFF, VPN-STATUS"
+print_warn "Добавь виджет Termux:Widget на домашний экран"
 
 # ─── Шаг 6: Автозапуск при загрузке ───
 print_step 6 "Автозапуск при включении телефона (Termux:Boot)..."
@@ -351,7 +340,7 @@ if [[ "$SETUP_BOOT" == "д" || "$SETUP_BOOT" == "y" ]]; then
     mkdir -p "$HOME/.termux/boot"
 
     cat > "$HOME/.termux/boot/start-turnable.sh" << BOOTEOF
-#!/usr/bin/env bash
+#!${BASH_BIN}
 sleep 15
 cd "$INSTALL_DIR"
 pkill -f "turnable client" 2>/dev/null
@@ -383,23 +372,19 @@ echo ""
 echo "  ─── Как использовать ───"
 echo ""
 echo "  В Termux:"
-echo "    cd ~/Turnable && ./start.sh     # с логами"
-echo "    cd ~/Turnable && ./start-bg.sh  # в фоне"
-echo "    cd ~/Turnable && ./stop.sh      # остановить"
-echo "    cd ~/Turnable && ./status.sh    # статус"
+echo "    cd ~/Turnable && bash start.sh     # с логами"
+echo "    cd ~/Turnable && bash start-bg.sh  # в фоне"
+echo "    cd ~/Turnable && bash stop.sh      # остановить"
+echo "    cd ~/Turnable && bash status.sh    # статус"
 echo ""
-
-if [[ "$SETUP_WIDGET" == "д" || "$SETUP_WIDGET" == "y" ]]; then
-    echo "  С домашнего экрана:"
-    echo "    Кнопка VPN-ON    — запустить"
-    echo "    Кнопка VPN-OFF   — остановить"
-    echo "    Кнопка VPN-STATUS — проверить"
-    echo ""
-fi
-
+echo "  С домашнего экрана:"
+echo "    Кнопка VPN-ON    — запустить"
+echo "    Кнопка VPN-OFF   — остановить"
+echo "    Кнопка VPN-STATUS — проверить"
+echo ""
 echo "  ─── Порядок включения VPN ───"
 echo ""
-echo "  1. Запусти Turnable (кнопка или ./start.sh)"
+echo "  1. Запусти Turnable (кнопка или bash start.sh)"
 echo "  2. Подожди ~10 секунд"
 echo "  3. Включи WireGuard в NekoBox"
 echo ""

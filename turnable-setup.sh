@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ============================================================
 #  Turnable Client — установка и настройка для Android (Termux)
@@ -198,7 +198,7 @@ print_step 4 "Создание скриптов запуска..."
 
 # Скрипт запуска
 cat > "$INSTALL_DIR/start.sh" << 'STARTEOF'
-#!/bin/bash
+#!/usr/bin/env bash
 cd "$(dirname "$0")"
 LISTEN="127.0.0.1:5080"
 CONFIG="wireguard.txt"
@@ -223,7 +223,7 @@ chmod +x "$INSTALL_DIR/start.sh"
 
 # Скрипт фонового запуска
 cat > "$INSTALL_DIR/start-bg.sh" << 'BGEOF'
-#!/bin/bash
+#!/usr/bin/env bash
 cd "$(dirname "$0")"
 LISTEN="127.0.0.1:5080"
 CONFIG="wireguard.txt"
@@ -262,7 +262,7 @@ chmod +x "$INSTALL_DIR/start-bg.sh"
 
 # Скрипт остановки
 cat > "$INSTALL_DIR/stop.sh" << 'STOPEOF'
-#!/bin/bash
+#!/usr/bin/env bash
 if [ -f "$(dirname "$0")/turnable.pid" ]; then
     PID=$(cat "$(dirname "$0")/turnable.pid")
     kill "$PID" 2>/dev/null
@@ -275,7 +275,7 @@ chmod +x "$INSTALL_DIR/stop.sh"
 
 # Скрипт проверки статуса
 cat > "$INSTALL_DIR/status.sh" << 'STATEOF'
-#!/bin/bash
+#!/usr/bin/env bash
 if pgrep -f "turnable client" >/dev/null 2>&1; then
     PID=$(pgrep -f "turnable client" | head -1)
     echo "Turnable РАБОТАЕТ (PID: $PID)"
@@ -300,7 +300,7 @@ if [[ "$SETUP_WIDGET" == "д" || "$SETUP_WIDGET" == "y" ]]; then
     mkdir -p "$HOME/.shortcuts"
 
     cat > "$HOME/.shortcuts/VPN-ON.sh" << WONEOF
-#!/bin/bash
+#!/usr/bin/env bash
 cd "$INSTALL_DIR"
 ./start-bg.sh
 echo ""
@@ -313,7 +313,7 @@ WONEOF
     chmod +x "$HOME/.shortcuts/VPN-ON.sh"
 
     cat > "$HOME/.shortcuts/VPN-OFF.sh" << WOFFEOF
-#!/bin/bash
+#!/usr/bin/env bash
 cd "$INSTALL_DIR"
 ./stop.sh
 echo "Не забудь отключить NekoBox"
@@ -324,7 +324,7 @@ WOFFEOF
     chmod +x "$HOME/.shortcuts/VPN-OFF.sh"
 
     cat > "$HOME/.shortcuts/VPN-STATUS.sh" << WSTEOF
-#!/bin/bash
+#!/usr/bin/env bash
 cd "$INSTALL_DIR"
 ./status.sh
 echo ""
@@ -351,7 +351,7 @@ if [[ "$SETUP_BOOT" == "д" || "$SETUP_BOOT" == "y" ]]; then
     mkdir -p "$HOME/.termux/boot"
 
     cat > "$HOME/.termux/boot/start-turnable.sh" << BOOTEOF
-#!/bin/bash
+#!/usr/bin/env bash
 sleep 15
 cd "$INSTALL_DIR"
 pkill -f "turnable client" 2>/dev/null

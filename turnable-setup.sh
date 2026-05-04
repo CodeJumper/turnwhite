@@ -4,15 +4,17 @@
 #  Turnable Client — установка и настройка для Android (Termux)
 # ============================================================
 
+# Гарантируем чтение с клавиатуры даже при curl | bash
+[ ! -t 0 ] && exec < /dev/tty
+
 set -e
 
 INSTALL_DIR="$HOME/Turnable"
 BASH_BIN="/data/data/com.termux/files/usr/bin/bash"
-TTY=/dev/tty
 
 ask() {
     printf "%s" "$1"
-    read REPLY < $TTY
+    read REPLY
 }
 
 echo ""

@@ -4,8 +4,11 @@
 #  Turnable Client — установка и настройка для Android (Termux)
 # ============================================================
 
-# Гарантируем чтение с клавиатуры даже при curl | bash
-[ ! -t 0 ] && exec < /dev/tty
+if [ ! -t 0 ]; then
+    echo "ОШИБКА: Нельзя запускать через pipe (curl | bash)"
+    echo "Используй: curl -sL URL -o ~/setup.sh && bash ~/setup.sh"
+    exit 1
+fi
 
 set -e
 

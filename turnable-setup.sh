@@ -154,10 +154,19 @@ print_step 3 "Настройка конфигурации..."
 CONFIG_FILE="$INSTALL_DIR/wireguard.txt"
 
 if [ -f "$CONFIG_FILE" ]; then
-    echo "  Конфиг уже есть: $(cat "$CONFIG_FILE" | head -c 60)..."
-    echo -n "  Заменить? (д/н): "
-    read -r REPLACE_CFG
-    if [[ "$REPLACE_CFG" != "д" && "$REPLACE_CFG" != "y" ]]; then
+    CURRENT_URL=$(cat "$CONFIG_FILE")
+    echo ""
+    echo "  Текущий Turnable URL:"
+    echo "  $CURRENT_URL"
+    echo ""
+    echo "  Что сделать?"
+    echo "  1) Оставить текущий URL"
+    echo "  2) Заменить на новый (например, с другим кол-вом peers)"
+    echo ""
+    printf "  Выбери (1 или 2): "
+    read REPLACE_CFG
+
+    if [ "$REPLACE_CFG" = "1" ]; then
         print_ok "Оставляю текущий конфиг"
         SKIP_CONFIG=1
     fi
@@ -171,22 +180,26 @@ if [ -z "$SKIP_CONFIG" ]; then
     echo "  (Получить его можно на сервере командой:"
     echo "   ./turnable config generate UUID ROUTE)"
     echo ""
-    echo -n "  URL: "
-    read -r CONFIG_URL
+    printf "  URL: "
+    read CONFIG_URL
 
     if [ -z "$CONFIG_URL" ]; then
         print_err "URL не может быть пустым"
         exit 1
     fi
 
-    if [[ "$CONFIG_URL" != turnable://* ]]; then
-        print_warn "URL не начинается с turnable:// — возможно ошибка"
-        echo -n "  Продолжить всё равно? (д/н): "
-        read -r FORCE
-        if [[ "$FORCE" != "д" && "$FORCE" != "y" ]]; then
-            exit 1
-        fi
-    fi
+    case "$CONFIG_URL" in
+        turnable://*)
+            ;;
+        *)
+            print_warn "URL не начинается с turnable:// — возможно ошибка"
+            printf "  Продолжить всё равно? (д/н): "
+            read FORCE
+            if [ "$FORCE" != "д" ] && [ "$FORCE" != "y" ]; then
+                exit 1
+            fi
+            ;;
+    esac
 
     echo "$CONFIG_URL" > "$CONFIG_FILE"
     print_ok "Конфиг сохранён"

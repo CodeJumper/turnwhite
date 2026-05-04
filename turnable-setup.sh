@@ -14,7 +14,7 @@ NC='\033[0m'
 
 INSTALL_DIR="$HOME/Turnable"
 LISTEN_ADDR="127.0.0.1:5080"
-BASH_BIN="$(which bash)"
+BASH_BIN="/data/data/com.termux/files/usr/bin/bash"
 
 print_step() { echo -e "\n${CYAN}[$1/$TOTAL_STEPS]${NC} $2"; }
 print_ok()   { echo -e "${GREEN}  OK:${NC} $1"; }
